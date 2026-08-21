@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-21T01:35:16.334Z",
+  "sourceRevision": "neenza@16c26d1+kamyu@4b89ed8+doocs@a0ced3e+newfacade@215604a+bridge@3",
+  "languages": [
+    "cpp",
+    "python"
+  ],
+  "totalLessons": 4931,
+  "singleCardFallbacks": 3,
+  "shards": [
+    {
+      "language": "cpp",
+      "difficulty": "easy",
+      "file": "cpp-easy.json.gz",
+      "count": 714,
+      "compressedBytes": 319975
+    },
+    {
+      "language": "cpp",
+      "difficulty": "hard",
+      "file": "cpp-hard.json.gz",
+      "count": 574,
+      "compressedBytes": 576264
+    },
+    {
+      "language": "cpp",
+      "difficulty": "medium",
+      "file": "cpp-medium.json.gz",
+      "count": 1206,
+      "compressedBytes": 827551
+    },
+    {
+      "language": "python",
+      "difficulty": "easy",
+      "file": "python-easy.json.gz",
+      "count": 714,
+      "compressedBytes": 260730
+    },
+    {
+      "language": "python",
+      "difficulty": "hard",
+      "file": "python-hard.json.gz",
+      "count": 530,
+      "compressedBytes": 380455
+    },
+    {
+      "language": "python",
+      "difficulty": "medium",
+      "file": "python-medium.json.gz",
+      "count": 1193,
+      "compressedBytes": 656713
+    }
+  ]
+}
