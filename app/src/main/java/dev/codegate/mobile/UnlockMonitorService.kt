@@ -13,6 +13,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
@@ -53,6 +54,9 @@ class UnlockMonitorService : Service() {
             return START_NOT_STICKY
         }
         showForegroundNotification(unlocked = false)
+        if (intent?.getBooleanExtra(EXTRA_LAUNCH_IF_INTERACTIVE, false) == true) {
+            launchAfterBootIfDeviceReady()
+        }
         return START_STICKY
     }
 
@@ -62,6 +66,12 @@ class UnlockMonitorService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun launchAfterBootIfDeviceReady() {
+        val powerManager = getSystemService(PowerManager::class.java)
+        if (powerManager?.isInteractive != true) return
+        launchCodeGateAfterWake(Intent.ACTION_SCREEN_ON)
+    }
 
     private fun launchCodeGateAfterWake(action: String?) {
         if (!Settings.canDrawOverlays(this)) return
@@ -140,5 +150,6 @@ class UnlockMonitorService : Service() {
         private const val NOTIFICATION_ID = 1001
         private const val ACTION_STOP = "dev.codegate.mobile.STOP_UNLOCK_MONITOR"
         private const val WAKE_LAUNCH_DEBOUNCE_MS = 1_500L
+        const val EXTRA_LAUNCH_IF_INTERACTIVE = "dev.codegate.mobile.LAUNCH_IF_INTERACTIVE"
     }
 }
