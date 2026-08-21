@@ -12,13 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import dev.codegate.mobile.ui.theme.CodeGateAndroidTheme
 
 class MainActivity : ComponentActivity() {
@@ -34,14 +27,10 @@ class MainActivity : ComponentActivity() {
         startUnlockMonitor()
         requestRequiredPermissions()
         enableEdgeToEdge()
+        val repository = LessonRepository(applicationContext)
         setContent {
             CodeGateAndroidTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                CodeGatePrototype(repository)
             }
         }
     }
@@ -69,21 +58,5 @@ class MainActivity : ComponentActivity() {
                 Uri.parse("package:$packageName")
             )
         )
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    CodeGateAndroidTheme {
-        Greeting("Android")
     }
 }
