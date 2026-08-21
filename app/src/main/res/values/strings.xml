@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">CodeGate Android</string>
+    <string name="unlock_monitor_channel">CodeGate unlock monitor</string>
+    <string name="unlock_monitor_channel_description">Keeps CodeGate available and reminds you after unlocking the phone.</string>
+    <string name="unlock_monitor_title">CodeGate is monitoring unlocks</string>
+    <string name="unlock_monitor_running">The reminder service is running.</string>
+    <string name="unlock_monitor_unlocked">Device active — tap to open CodeGate.</string>
+    <string name="unlock_monitor_stop">Stop</string>
 </resources>
