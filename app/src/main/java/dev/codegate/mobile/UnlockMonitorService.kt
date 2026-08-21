@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -12,14 +13,19 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
 class UnlockMonitorService : Service() {
+    private var lastWakeLaunchAt = 0L
+
     private val unlockReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_USER_PRESENT || intent.action == Intent.ACTION_SCREEN_ON) {
                 showForegroundNotification(unlocked = true)
+                launchCodeGateAfterWake(intent.action)
             }
         }
     }
@@ -56,6 +62,27 @@ class UnlockMonitorService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun launchCodeGateAfterWake(action: String?) {
+        if (!Settings.canDrawOverlays(this)) return
+
+        if (action == Intent.ACTION_SCREEN_ON) {
+            val keyguardManager = getSystemService(KeyguardManager::class.java)
+            if (keyguardManager?.isKeyguardLocked == true) return
+        }
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastWakeLaunchAt < WAKE_LAUNCH_DEBOUNCE_MS) return
+        lastWakeLaunchAt = now
+
+        startActivity(
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+        )
+    }
 
     private fun showForegroundNotification(unlocked: Boolean) {
         val notification = buildNotification(unlocked)
@@ -112,5 +139,6 @@ class UnlockMonitorService : Service() {
         private const val CHANNEL_ID = "codegate_unlock_monitor"
         private const val NOTIFICATION_ID = 1001
         private const val ACTION_STOP = "dev.codegate.mobile.STOP_UNLOCK_MONITOR"
+        private const val WAKE_LAUNCH_DEBOUNCE_MS = 1_500L
     }
 }
