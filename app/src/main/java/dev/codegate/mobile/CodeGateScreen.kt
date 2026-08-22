@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -43,6 +45,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -210,7 +213,10 @@ fun CodeGateScreen(
                         }
 
                         if (mode == ExerciseMode.SYNTAX) {
-                            SettingRow("Syntax size") {
+                            SettingRow(
+                                label = "Next syntax size",
+                                description = "Controls how much syntax each correct choice inserts."
+                            ) {
                                 SyntaxSize.entries.forEach { size ->
                                     ChoiceChip(size.name.lowercase().replaceFirstChar { it.uppercase() }, syntaxSize == size) {
                                         syntaxSize = size
@@ -297,9 +303,16 @@ fun CodeGateScreen(
 }
 
 @Composable
-private fun SettingRow(label: String, content: @Composable RowScope.() -> Unit) {
+private fun SettingRow(
+    label: String,
+    description: String? = null,
+    content: @Composable RowScope.() -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
+        description?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall)
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -440,6 +453,15 @@ private fun CodeChoice(code: String, onClick: () -> Unit) {
 private fun CodePanel(source: String) {
     var caretVisible by remember(source) { mutableStateOf(true) }
     val caretIndex = source.indexOf(CARET_MARKER)
+    val verticalScroll = rememberScrollState()
+    val horizontalScroll = rememberScrollState()
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    LaunchedEffect(source) {
+        if (caretIndex < 0) return@LaunchedEffect
+        withFrameNanos { }
+        verticalScroll.animateScrollTo(verticalScroll.maxValue)
+        bringIntoViewRequester.bringIntoView()
+    }
     LaunchedEffect(source) {
         if (caretIndex < 0) return@LaunchedEffect
         while (true) {
@@ -458,7 +480,9 @@ private fun CodePanel(source: String) {
         }
     }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester),
         colors = CardDefaults.cardColors(containerColor = CodeGateCodeBackground)
     ) {
         Text(
@@ -466,8 +490,8 @@ private fun CodePanel(source: String) {
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 180.dp, max = 420.dp)
-                .verticalScroll(rememberScrollState())
-                .horizontalScroll(rememberScrollState())
+                .verticalScroll(verticalScroll)
+                .horizontalScroll(horizontalScroll)
                 .padding(14.dp),
             fontFamily = FontFamily.Monospace,
             color = CodeGateText,
@@ -482,6 +506,7 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
     var message by remember(lesson.id) { mutableStateOf("") }
     var checking by remember(lesson.id) { mutableStateOf(false) }
     var readyToSubmit by remember(lesson.id) { mutableStateOf(false) }
+    val messageRequester = remember { BringIntoViewRequester() }
     val byId = remember(lesson.id) { lesson.blocks.associateBy { it.id } }
     val available = remember(lesson.id) { lesson.blocks.shuffled() }
         .filterNot { it.id in selected }
@@ -494,6 +519,12 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
         delay(350)
         readyToSubmit = selected == lesson.correctOrder
         checking = false
+    }
+
+    LaunchedEffect(message) {
+        if (message.isEmpty()) return@LaunchedEffect
+        withFrameNanos { }
+        messageRequester.bringIntoView()
     }
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -560,7 +591,13 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
             }
         }
     }
-    if (message.isNotEmpty()) Text(message)
+    if (message.isNotEmpty()) {
+        Text(
+            text = message,
+            modifier = Modifier.bringIntoViewRequester(messageRequester),
+            color = MaterialTheme.colorScheme.error
+        )
+    }
 }
 
 @Composable
@@ -569,7 +606,14 @@ private fun SyntaxExercise(lesson: Lesson, size: SyntaxSize, onSubmit: () -> Uni
     var cursor by remember(lesson.id, size) { mutableIntStateOf(0) }
     var history by remember(lesson.id, size) { mutableStateOf(emptyList<Int>()) }
     var message by remember(lesson.id, size) { mutableStateOf("") }
+    val messageRequester = remember { BringIntoViewRequester() }
     val choices = remember(lesson.id, size, cursor) { engine.choices(cursor, size) }
+
+    LaunchedEffect(message) {
+        if (message.isEmpty()) return@LaunchedEffect
+        withFrameNanos { }
+        messageRequester.bringIntoView()
+    }
 
     val progress = if (engine.tokenCount == 0) 1f else cursor.toFloat() / engine.tokenCount
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -614,5 +658,11 @@ private fun SyntaxExercise(lesson: Lesson, size: SyntaxSize, onSubmit: () -> Uni
             shape = RoundedCornerShape(10.dp)
         ) { Text("Submit") }
     }
-    if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.error)
+    if (message.isNotEmpty()) {
+        Text(
+            text = message,
+            modifier = Modifier.bringIntoViewRequester(messageRequester),
+            color = MaterialTheme.colorScheme.error
+        )
+    }
 }
