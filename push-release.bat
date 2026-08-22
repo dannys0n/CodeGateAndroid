@@ -81,36 +81,8 @@ if errorlevel 1 (
 
 echo.
 echo Updating Android package versions...
-set "VERSION_SCRIPT=%TEMP%\codegate-android-version-%RANDOM%-%RANDOM%.ps1"
-(
-    echo $ErrorActionPreference = 'Stop'
-    echo $path = 'app/build.gradle.kts'
-    echo $text = [IO.File]::ReadAllText($path^)
-    echo $codePattern = [regex]'versionCode\s*=\s*(\d+)'
-    echo $namePattern = [regex]'versionName\s*=\s*"([^"]+)"'
-    echo $codeMatch = $codePattern.Match($text^)
-    echo $nameMatch = $namePattern.Match($text^)
-    echo if (-not $codeMatch.Success -or -not $nameMatch.Success^) { throw 'Unable to find Android version fields.' }
-    echo $parts = $nameMatch.Groups[1].Value.Split('.'^)
-    echo $major = [int]$parts[0]
-    echo $minor = if ($parts.Length -gt 1^) { [int]$parts[1] } else { 0 }
-    echo $patch = if ($parts.Length -gt 2^) { [int]$parts[2] } else { 0 }
-    echo switch ('%BUMP%'^) {
-    echo     'major' { $major++; $minor = 0; $patch = 0 }
-    echo     'minor' { $minor++; $patch = 0 }
-    echo     default { $patch++ }
-    echo }
-    echo $next = "$major.$minor.$patch"
-    echo $nextCode = [int]$codeMatch.Groups[1].Value + 1
-    echo $text = $codePattern.Replace($text, "versionCode = $nextCode", 1^)
-    echo $text = $namePattern.Replace($text, "versionName = `"$next`"", 1^)
-    echo [IO.File]::WriteAllText($path, $text, [Text.UTF8Encoding]::new($false^)^)
-    echo Write-Output $next
-) > "%VERSION_SCRIPT%"
-
-for /f "delims=" %%V in ('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%VERSION_SCRIPT%"') do set "NEW_VERSION=%%V"
+for /f "delims=" %%V in ('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\release-version.ps1" -Bump "%BUMP%"') do set "NEW_VERSION=%%V"
 set "VERSION_RESULT=%ERRORLEVEL%"
-del /q "%VERSION_SCRIPT%" >nul 2>nul
 if not "%VERSION_RESULT%"=="0" (
     echo Version update failed. Nothing was committed.
     exit /b 1
