@@ -55,11 +55,12 @@ class LessonRepository(private val context: Context) {
     fun lesson(
         language: String,
         problemId: String? = null,
-        allowedDifficulties: Set<ProblemDifficulty> = ProblemDifficulty.entries.toSet()
+        allowedDifficulties: Set<ProblemDifficulty> = ProblemDifficulty.entries.toSet(),
+        excludedProblemIds: Set<String> = emptySet()
     ): Lesson {
         val lessons = cache.computeIfAbsent(language, ::loadLanguage)
-            .filter { it.difficulty in allowedDifficulties }
-        require(lessons.isNotEmpty()) { "No lessons match the selected difficulties." }
+            .filter { it.difficulty in allowedDifficulties && it.problemId !in excludedProblemIds }
+        require(lessons.isNotEmpty()) { "No unsolved lessons match the selected difficulties." }
         if (problemId != null) {
             lessons.firstOrNull { it.problemId == problemId }?.let { return it }
         }

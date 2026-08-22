@@ -124,10 +124,36 @@ fun CodeGateScreen(
     var settingsExpanded by rememberSaveable { mutableStateOf(false) }
     var wakeLaunchEnabled by remember { mutableStateOf(WakeLaunchSettings.isEnabled(context)) }
     var startsAfterBoot by remember { mutableStateOf(WakeLaunchSettings.startsAfterBoot(context)) }
-    val lessonResult by produceState<Result<Lesson>?>(null, language, problemKey, allowedDifficulties) {
+    var allowSolvedProblems by remember {
+        mutableStateOf(preferences.getBoolean("allow_solved_problems", false))
+    }
+    var solvedProblemKeys by remember {
+        mutableStateOf(preferences.getStringSet("solved_problems", emptySet())?.toSet().orEmpty())
+    }
+    val excludedProblemIds = if (allowSolvedProblems) {
+        emptySet()
+    } else {
+        solvedProblemKeys.mapNotNullTo(mutableSetOf()) { key ->
+            key.removePrefix("$language:").takeIf { key.startsWith("$language:") }
+        }
+    }
+    val lessonResult by produceState<Result<Lesson>?>(
+        null,
+        language,
+        problemKey,
+        allowedDifficulties,
+        excludedProblemIds
+    ) {
         value = null
         val loaded = withContext(Dispatchers.IO) {
-            runCatching { repository.lesson(language, selectedProblemId, allowedDifficulties) }
+            runCatching {
+                repository.lesson(
+                    language = language,
+                    problemId = selectedProblemId,
+                    allowedDifficulties = allowedDifficulties,
+                    excludedProblemIds = excludedProblemIds
+                )
+            }
         }
         value = loaded
         loaded.getOrNull()?.let { selectedProblemId = it.problemId }
@@ -242,6 +268,26 @@ fun CodeGateScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                Text("Allow solved problems", style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    "Include completed problems when choosing a new lesson.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Switch(
+                                checked = allowSolvedProblems,
+                                onCheckedChange = { enabled ->
+                                    allowSolvedProblems = enabled
+                                    preferences.edit { putBoolean("allow_solved_problems", enabled) }
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text("Open on device wake", style = MaterialTheme.typography.labelLarge)
                                 Text(
                                     "Run the foreground service at boot and open CodeGate when the screen becomes active.",
@@ -302,11 +348,18 @@ fun CodeGateScreen(
                     }
                 }
             } else {
-                ProblemCard(currentLesson)
+                val solvedKey = "${currentLesson.language}:${currentLesson.problemId}"
+                val completeLesson = {
+                    val updated = solvedProblemKeys + solvedKey
+                    solvedProblemKeys = updated
+                    preferences.edit { putStringSet("solved_problems", updated) }
+                    onSubmit()
+                }
+                ProblemCard(currentLesson, solvedKey in solvedProblemKeys)
                 if (mode == ExerciseMode.BLOCKS) {
-                    BlockExercise(currentLesson, onSubmit)
+                    BlockExercise(currentLesson, completeLesson)
                 } else {
-                    SyntaxExercise(currentLesson, syntaxSize, onSubmit)
+                    SyntaxExercise(currentLesson, syntaxSize, completeLesson)
                 }
             }
         }
@@ -388,14 +441,26 @@ private fun DifficultyBadge(difficulty: ProblemDifficulty) {
 }
 
 @Composable
-private fun ProblemCard(lesson: Lesson) {
+private fun ProblemCard(lesson: Lesson, solved: Boolean) {
     var hintVisible by remember(lesson.id) { mutableStateOf(false) }
+    val problemNumber = lesson.problemId.toIntOrNull()?.takeIf { it > 0 }
+    val title = problemNumber?.let { "$it. ${lesson.title}" } ?: lesson.title
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(lesson.title, style = MaterialTheme.typography.titleLarge)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                if (solved) SolvedBadge()
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DifficultyBadge(lesson.difficulty)
                 Text(
@@ -430,6 +495,22 @@ private fun ProblemCard(lesson: Lesson) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SolvedBadge() {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = CodeGateDifficultyEasy,
+        contentColor = Color.Black
+    ) {
+        Text(
+            text = "✓ Solved",
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
