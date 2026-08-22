@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-22T01:45:10.769Z",
+  "generatedAt": "2026-08-22T03:56:43.664Z",
   "sourceRevision": "neenza@16c26d1+kamyu@4b89ed8+doocs@a0ced3e+newfacade@215604a+bridge@3",
   "languages": [
     "cpp",
@@ -14,28 +14,28 @@
       "difficulty": "beginner",
       "file": "cpp-beginner.json.gz",
       "count": 90,
-      "compressedBytes": 11287
+      "compressedBytes": 11169
     },
     {
       "language": "cpp",
       "difficulty": "easy",
       "file": "cpp-easy.json.gz",
       "count": 624,
-      "compressedBytes": 309251
+      "compressedBytes": 306115
     },
     {
       "language": "cpp",
       "difficulty": "hard",
       "file": "cpp-hard.json.gz",
       "count": 574,
-      "compressedBytes": 576264
+      "compressedBytes": 574105
     },
     {
       "language": "cpp",
       "difficulty": "medium",
       "file": "cpp-medium.json.gz",
       "count": 1206,
-      "compressedBytes": 827551
+      "compressedBytes": 822034
     },
     {
       "language": "python",
