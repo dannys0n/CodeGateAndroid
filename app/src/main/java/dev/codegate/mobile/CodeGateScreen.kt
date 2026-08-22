@@ -194,7 +194,7 @@ fun CodeGateScreen(
                             }
                         }
 
-                        SettingRow("Problem difficulty") {
+                        SettingRow("LeetCode difficulty filter") {
                             ProblemDifficulty.entries.forEach { difficulty ->
                                 ChoiceChip(
                                     label = difficulty.displayName,
