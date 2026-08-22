@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -62,11 +64,15 @@ import dev.codegate.mobile.ui.theme.CodeGateDifficultyMedium
 import dev.codegate.mobile.ui.theme.CodeGateText
 
 private enum class ExerciseMode { BLOCKS, SYNTAX }
-private val AVAILABLE_DIFFICULTIES = setOf("beginner", "easy", "medium", "hard")
-private val DEFAULT_DIFFICULTIES = setOf("easy", "medium", "hard")
+private const val CARET_MARKER = '\u258C'
+private val DEFAULT_DIFFICULTIES = setOf(
+    ProblemDifficulty.EASY,
+    ProblemDifficulty.MEDIUM,
+    ProblemDifficulty.HARD
+)
 
 @Composable
-fun CodeGatePrototype(
+fun CodeGateScreen(
     repository: LessonRepository,
     onSubmit: () -> Unit,
     onWakeLaunchChanged: (Boolean) -> Unit
@@ -76,7 +82,9 @@ fun CodeGatePrototype(
     var language by remember { mutableStateOf(preferences.getString("language", "cpp") ?: "cpp") }
     var mode by remember {
         mutableStateOf(
-            runCatching { ExerciseMode.valueOf(preferences.getString("mode", "BLOCKS")!!) }
+            runCatching {
+                ExerciseMode.valueOf(preferences.getString("mode", ExerciseMode.BLOCKS.name).orEmpty())
+            }
                 .getOrDefault(ExerciseMode.BLOCKS)
         )
     }
@@ -88,15 +96,18 @@ fun CodeGatePrototype(
     }
     var allowedDifficulties by remember {
         mutableStateOf(
-            preferences.getStringSet("problem_difficulties", DEFAULT_DIFFICULTIES)
-                ?.intersect(AVAILABLE_DIFFICULTIES)
+            preferences.getStringSet(
+                "problem_difficulties",
+                DEFAULT_DIFFICULTIES.mapTo(mutableSetOf()) { it.storageKey }
+            )
+                ?.mapNotNullTo(mutableSetOf(), ProblemDifficulty::fromStorageKey)
                 ?.takeIf { it.isNotEmpty() }
                 ?: DEFAULT_DIFFICULTIES
         )
     }
-    var problemKey by remember { mutableIntStateOf(0) }
-    var selectedProblemId by remember { mutableStateOf<String?>(null) }
-    var settingsExpanded by remember { mutableStateOf(false) }
+    var problemKey by rememberSaveable { mutableIntStateOf(0) }
+    var selectedProblemId by rememberSaveable { mutableStateOf<String?>(null) }
+    var settingsExpanded by rememberSaveable { mutableStateOf(false) }
     var wakeLaunchEnabled by remember { mutableStateOf(WakeLaunchSettings.isEnabled(context)) }
     var startsAfterBoot by remember { mutableStateOf(WakeLaunchSettings.startsAfterBoot(context)) }
     val lessonResult by produceState<Result<Lesson>?>(null, language, problemKey, allowedDifficulties) {
@@ -151,30 +162,29 @@ fun CodeGatePrototype(
                         SettingRow("Language") {
                             ChoiceChip("C++", language == "cpp") {
                                 language = "cpp"
-                                preferences.edit().putString("language", language).apply()
+                                preferences.edit { putString("language", language) }
                             }
                             ChoiceChip("Python", language == "python") {
                                 language = "python"
-                                preferences.edit().putString("language", language).apply()
+                                preferences.edit { putString("language", language) }
                             }
                         }
 
                         SettingRow("Input mode") {
                             ChoiceChip("Code blocks", mode == ExerciseMode.BLOCKS) {
                                 mode = ExerciseMode.BLOCKS
-                                preferences.edit().putString("mode", mode.name).apply()
+                                preferences.edit { putString("mode", mode.name) }
                             }
                             ChoiceChip("Syntax choices", mode == ExerciseMode.SYNTAX) {
                                 mode = ExerciseMode.SYNTAX
-                                preferences.edit().putString("mode", mode.name).apply()
+                                preferences.edit { putString("mode", mode.name) }
                             }
                         }
 
                         SettingRow("Problem difficulty") {
-                            AVAILABLE_DIFFICULTIES.forEach { difficulty ->
-                                val label = difficulty.replaceFirstChar { it.uppercase() }
+                            ProblemDifficulty.entries.forEach { difficulty ->
                                 ChoiceChip(
-                                    label = label,
+                                    label = difficulty.displayName,
                                     selected = difficulty in allowedDifficulties,
                                     selectedColor = difficultyColor(difficulty),
                                     selectedContentColor = difficultyContentColor(difficulty)
@@ -186,9 +196,12 @@ fun CodeGatePrototype(
                                     }
                                     if (updated.isNotEmpty()) {
                                         allowedDifficulties = updated
-                                        preferences.edit()
-                                            .putStringSet("problem_difficulties", updated)
-                                            .apply()
+                                        preferences.edit {
+                                            putStringSet(
+                                                "problem_difficulties",
+                                                updated.mapTo(mutableSetOf()) { it.storageKey }
+                                            )
+                                        }
                                         selectedProblemId = null
                                         problemKey++
                                     }
@@ -201,7 +214,7 @@ fun CodeGatePrototype(
                                 SyntaxSize.entries.forEach { size ->
                                     ChoiceChip(size.name.lowercase().replaceFirstChar { it.uppercase() }, syntaxSize == size) {
                                         syntaxSize = size
-                                        preferences.edit().putString("syntax_size", size.name).apply()
+                                        preferences.edit { putString("syntax_size", size.name) }
                                     }
                                 }
                             }
@@ -322,27 +335,27 @@ private fun ChoiceChip(
     )
 }
 
-private fun difficultyColor(difficulty: String): Color = when (difficulty.lowercase()) {
-    "beginner" -> CodeGateDifficultyBeginner
-    "medium" -> CodeGateDifficultyMedium
-    "hard" -> CodeGateDifficultyHard
-    else -> CodeGateDifficultyEasy
+private fun difficultyColor(difficulty: ProblemDifficulty): Color = when (difficulty) {
+    ProblemDifficulty.BEGINNER -> CodeGateDifficultyBeginner
+    ProblemDifficulty.EASY -> CodeGateDifficultyEasy
+    ProblemDifficulty.MEDIUM -> CodeGateDifficultyMedium
+    ProblemDifficulty.HARD -> CodeGateDifficultyHard
 }
 
-private fun difficultyContentColor(difficulty: String): Color = when (difficulty.lowercase()) {
-    "beginner", "hard" -> Color.White
-    else -> Color.Black
+private fun difficultyContentColor(difficulty: ProblemDifficulty): Color = when (difficulty) {
+    ProblemDifficulty.BEGINNER, ProblemDifficulty.HARD -> Color.White
+    ProblemDifficulty.EASY, ProblemDifficulty.MEDIUM -> Color.Black
 }
 
 @Composable
-private fun DifficultyBadge(difficulty: String) {
+private fun DifficultyBadge(difficulty: ProblemDifficulty) {
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = difficultyColor(difficulty),
         contentColor = difficultyContentColor(difficulty)
     ) {
         Text(
-            text = difficulty,
+            text = difficulty.displayName,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold
@@ -426,7 +439,7 @@ private fun CodeChoice(code: String, onClick: () -> Unit) {
 @Composable
 private fun CodePanel(source: String) {
     var caretVisible by remember(source) { mutableStateOf(true) }
-    val caretIndex = source.indexOf('▌')
+    val caretIndex = source.indexOf(CARET_MARKER)
     LaunchedEffect(source) {
         if (caretIndex < 0) return@LaunchedEffect
         while (true) {
@@ -473,7 +486,7 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
     val available = remember(lesson.id) { lesson.blocks.shuffled() }
         .filterNot { it.id in selected }
     val assembled = lesson.fixedPrefix + selected.mapNotNull(byId::get)
-        .joinToString(separator = "") { it.sourceCode } + "\n        ▌" + lesson.fixedSuffix
+        .joinToString(separator = "") { it.sourceCode } + "\n        $CARET_MARKER" + lesson.fixedSuffix
     val progress = if (lesson.correctOrder.isEmpty()) 1f else selected.size.toFloat() / lesson.correctOrder.size
 
     LaunchedEffect(checking, selected) {

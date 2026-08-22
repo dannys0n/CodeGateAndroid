@@ -3,7 +3,6 @@ package dev.codegate.mobile
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -12,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import dev.codegate.mobile.ui.theme.CodeGateAndroidTheme
 
 class MainActivity : ComponentActivity() {
@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
         val repository = LessonRepository(applicationContext)
         setContent {
             CodeGateAndroidTheme {
-                CodeGatePrototype(
+                CodeGateScreen(
                     repository = repository,
                     onSubmit = ::finishAndRemoveTask,
                     onWakeLaunchChanged = ::setWakeLaunchEnabled
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
         startActivity(
             Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
+                "package:$packageName".toUri()
             )
         )
     }

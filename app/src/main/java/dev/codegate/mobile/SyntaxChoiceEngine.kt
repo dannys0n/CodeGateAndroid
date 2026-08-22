@@ -68,7 +68,7 @@ class SyntaxChoiceEngine(private val lesson: Lesson) {
 
     fun renderedSource(cursor: Int): String {
         val accepted = tokens.take(cursor).joinToString(separator = "") { it.leading + it.text }
-        val marker = if (cursor < tokens.size) tokens[cursor].leading + "▌" else ""
+        val marker = if (cursor < tokens.size) tokens[cursor].leading + CARET_MARKER else ""
         return lesson.fixedPrefix + accepted + marker + lesson.fixedSuffix
     }
 
@@ -178,6 +178,7 @@ class SyntaxChoiceEngine(private val lesson: Lesson) {
     }
 
     companion object {
+        private const val CARET_MARKER = '\u258C'
         private val CPP_KEYWORDS = setOf("auto", "bool", "break", "case", "char", "const", "continue", "double", "else", "false", "float", "for", "if", "int", "long", "return", "string", "true", "vector", "void", "while")
         private val PYTHON_KEYWORDS = setOf("and", "break", "continue", "def", "elif", "else", "False", "for", "if", "in", "is", "lambda", "None", "not", "or", "pass", "return", "True", "while")
         private val CPP_MEMBERS = listOf("begin", "end", "find", "contains", "insert", "erase", "size", "empty", "push_back", "pop_back", "front", "back")

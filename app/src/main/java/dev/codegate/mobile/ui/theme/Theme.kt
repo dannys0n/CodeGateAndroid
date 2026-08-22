@@ -26,7 +26,7 @@ fun CodeGateAndroidTheme(
 ) {
     MaterialTheme(
         colorScheme = CodeGateColorScheme,
-        typography = Typography,
+        typography = CodeGateTypography,
         content = content
     )
 }

@@ -2,6 +2,7 @@ package dev.codegate.mobile
 
 import android.content.Context
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.GZIPInputStream
 import kotlin.random.Random
 
@@ -11,11 +12,23 @@ data class LessonBlock(
     val sourceCode: String
 )
 
+enum class ProblemDifficulty(val storageKey: String, val displayName: String) {
+    BEGINNER("beginner", "Beginner"),
+    EASY("easy", "Easy"),
+    MEDIUM("medium", "Medium"),
+    HARD("hard", "Hard");
+
+    companion object {
+        fun fromStorageKey(value: String): ProblemDifficulty? =
+            entries.firstOrNull { it.storageKey == value.lowercase() }
+    }
+}
+
 data class Lesson(
     val id: String,
     val problemId: String,
     val title: String,
-    val difficulty: String,
+    val difficulty: ProblemDifficulty,
     val language: String,
     val statement: String,
     val examples: List<String>,
@@ -36,15 +49,16 @@ data class Lesson(
 }
 
 class LessonRepository(private val context: Context) {
-    private val cache = mutableMapOf<String, List<Lesson>>()
+    private val cache = ConcurrentHashMap<String, List<Lesson>>()
+    private val packagedFiles by lazy { context.assets.list(ASSET_DIRECTORY).orEmpty().toSet() }
 
     fun lesson(
         language: String,
         problemId: String? = null,
-        allowedDifficulties: Set<String> = ALL_DIFFICULTIES
+        allowedDifficulties: Set<ProblemDifficulty> = ProblemDifficulty.entries.toSet()
     ): Lesson {
-        val lessons = cache.getOrPut(language) { loadLanguage(language) }
-            .filter { it.difficulty.lowercase() in allowedDifficulties }
+        val lessons = cache.computeIfAbsent(language, ::loadLanguage)
+            .filter { it.difficulty in allowedDifficulties }
         require(lessons.isNotEmpty()) { "No lessons match the selected difficulties." }
         if (problemId != null) {
             lessons.firstOrNull { it.problemId == problemId }?.let { return it }
@@ -53,19 +67,20 @@ class LessonRepository(private val context: Context) {
     }
 
     private fun loadLanguage(language: String): List<Lesson> =
-        listOf("beginner", "easy", "medium", "hard").flatMap { difficulty ->
+        ProblemDifficulty.entries.flatMap { difficulty ->
             loadShard(language, difficulty)
         }
 
-    private fun loadShard(language: String, difficulty: String): List<Lesson> {
-        val baseName = "$language-$difficulty.json"
-        val packagedFiles = context.assets.list("codegate").orEmpty().toSet()
+    private fun loadShard(language: String, difficulty: ProblemDifficulty): List<Lesson> {
+        val baseName = "$language-${difficulty.storageKey}.json"
         val json = if ("$baseName.gz" in packagedFiles) {
-            context.assets.open("codegate/$baseName.gz").use { input ->
+            context.assets.open("$ASSET_DIRECTORY/$baseName.gz").use { input ->
                 GZIPInputStream(input).bufferedReader(Charsets.UTF_8).use { it.readText() }
             }
         } else {
-            context.assets.open("codegate/$baseName").bufferedReader(Charsets.UTF_8).use { it.readText() }
+            context.assets.open("$ASSET_DIRECTORY/$baseName")
+                .bufferedReader(Charsets.UTF_8)
+                .use { it.readText() }
         }
         val lessons = JSONObject(json).getJSONArray("lessons")
         return buildList(lessons.length()) {
@@ -89,7 +104,8 @@ class LessonRepository(private val context: Context) {
                         id = item.getString("id"),
                         problemId = item.getString("problemId"),
                         title = item.getString("title"),
-                        difficulty = item.getString("difficulty"),
+                        difficulty = ProblemDifficulty.fromStorageKey(item.getString("difficulty"))
+                            ?: error("Unknown problem difficulty in $baseName"),
                         language = item.getString("language"),
                         statement = item.getString("statement"),
                         examples = item.getJSONArray("examples").toStringList(),
@@ -105,7 +121,7 @@ class LessonRepository(private val context: Context) {
     }
 
     private companion object {
-        val ALL_DIFFICULTIES = setOf("beginner", "easy", "medium", "hard")
+        const val ASSET_DIRECTORY = "codegate"
     }
 }
 
