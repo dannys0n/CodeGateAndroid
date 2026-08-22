@@ -1,0 +1,58 @@
+name: Release unsigned APK
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
+
+      - name: Install Android API 37
+        run: sdkmanager "platforms;android-37"
+
+      - name: Build and verify release
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest lintRelease assembleRelease
+
+      - name: Prepare release files
+        id: package
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          apk="CodeGate-Android-${version}-unsigned.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$apk"
+          sha256sum "$apk" > "$apk.sha256"
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.package.outputs.apk }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$APK" "$APK.sha256" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$APK" "$APK.sha256" \
+              --title "CodeGate Android $GITHUB_REF_NAME" \
+              --generate-notes
+          fi
