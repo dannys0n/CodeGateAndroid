@@ -38,16 +38,27 @@ data class Lesson(
 class LessonRepository(private val context: Context) {
     private val cache = mutableMapOf<String, List<Lesson>>()
 
-    fun lesson(language: String, problemId: String? = null): Lesson {
-        val lessons = cache.getOrPut(language) { loadShard(language) }
+    fun lesson(
+        language: String,
+        problemId: String? = null,
+        allowedDifficulties: Set<String> = ALL_DIFFICULTIES
+    ): Lesson {
+        val lessons = cache.getOrPut(language) { loadLanguage(language) }
+            .filter { it.difficulty.lowercase() in allowedDifficulties }
+        require(lessons.isNotEmpty()) { "No lessons match the selected difficulties." }
         if (problemId != null) {
             lessons.firstOrNull { it.problemId == problemId }?.let { return it }
         }
         return lessons[Random.nextInt(lessons.size)]
     }
 
-    private fun loadShard(language: String): List<Lesson> {
-        val baseName = if (language == "python") "python-easy.json" else "cpp-easy.json"
+    private fun loadLanguage(language: String): List<Lesson> =
+        listOf("easy", "medium", "hard").flatMap { difficulty ->
+            loadShard(language, difficulty)
+        }
+
+    private fun loadShard(language: String, difficulty: String): List<Lesson> {
+        val baseName = "$language-$difficulty.json"
         val packagedFiles = context.assets.list("codegate").orEmpty().toSet()
         val json = if ("$baseName.gz" in packagedFiles) {
             context.assets.open("codegate/$baseName.gz").use { input ->
@@ -91,6 +102,10 @@ class LessonRepository(private val context: Context) {
                 )
             }
         }
+    }
+
+    private companion object {
+        val ALL_DIFFICULTIES = setOf("easy", "medium", "hard")
     }
 }
 

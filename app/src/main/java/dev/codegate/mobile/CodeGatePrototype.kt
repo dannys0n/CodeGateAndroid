@@ -54,6 +54,7 @@ import dev.codegate.mobile.ui.theme.CodeGateCodeBackground
 import dev.codegate.mobile.ui.theme.CodeGateText
 
 private enum class ExerciseMode { BLOCKS, SYNTAX }
+private val ALL_DIFFICULTIES = setOf("easy", "medium", "hard")
 
 @Composable
 fun CodeGatePrototype(
@@ -76,15 +77,23 @@ fun CodeGatePrototype(
                 .getOrDefault(SyntaxSize.MEDIUM)
         )
     }
+    var allowedDifficulties by remember {
+        mutableStateOf(
+            preferences.getStringSet("problem_difficulties", ALL_DIFFICULTIES)
+                ?.intersect(ALL_DIFFICULTIES)
+                ?.takeIf { it.isNotEmpty() }
+                ?: ALL_DIFFICULTIES
+        )
+    }
     var problemKey by remember { mutableIntStateOf(0) }
     var selectedProblemId by remember { mutableStateOf<String?>(null) }
     var settingsExpanded by remember { mutableStateOf(false) }
     var wakeLaunchEnabled by remember { mutableStateOf(WakeLaunchSettings.isEnabled(context)) }
     var startsAfterBoot by remember { mutableStateOf(WakeLaunchSettings.startsAfterBoot(context)) }
-    val lessonResult by produceState<Result<Lesson>?>(null, language, problemKey) {
+    val lessonResult by produceState<Result<Lesson>?>(null, language, problemKey, allowedDifficulties) {
         value = null
         val loaded = withContext(Dispatchers.IO) {
-            runCatching { repository.lesson(language, selectedProblemId) }
+            runCatching { repository.lesson(language, selectedProblemId, allowedDifficulties) }
         }
         value = loaded
         loaded.getOrNull()?.let { selectedProblemId = it.problemId }
@@ -149,6 +158,27 @@ fun CodeGatePrototype(
                             ChoiceChip("Syntax choices", mode == ExerciseMode.SYNTAX) {
                                 mode = ExerciseMode.SYNTAX
                                 preferences.edit().putString("mode", mode.name).apply()
+                            }
+                        }
+
+                        SettingRow("Problem difficulty") {
+                            ALL_DIFFICULTIES.forEach { difficulty ->
+                                val label = difficulty.replaceFirstChar { it.uppercase() }
+                                ChoiceChip(label, difficulty in allowedDifficulties) {
+                                    val updated = if (difficulty in allowedDifficulties) {
+                                        allowedDifficulties - difficulty
+                                    } else {
+                                        allowedDifficulties + difficulty
+                                    }
+                                    if (updated.isNotEmpty()) {
+                                        allowedDifficulties = updated
+                                        preferences.edit()
+                                            .putStringSet("problem_difficulties", updated)
+                                            .apply()
+                                        selectedProblemId = null
+                                        problemKey++
+                                    }
+                                }
                             }
                         }
 
