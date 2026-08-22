@@ -47,6 +47,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -423,12 +425,31 @@ private fun CodeChoice(code: String, onClick: () -> Unit) {
 
 @Composable
 private fun CodePanel(source: String) {
+    var caretVisible by remember(source) { mutableStateOf(true) }
+    val caretIndex = source.indexOf('▌')
+    LaunchedEffect(source) {
+        if (caretIndex < 0) return@LaunchedEffect
+        while (true) {
+            delay(500)
+            caretVisible = !caretVisible
+        }
+    }
+    val renderedSource = buildAnnotatedString {
+        append(source)
+        if (caretIndex >= 0 && !caretVisible) {
+            addStyle(
+                SpanStyle(color = Color.Transparent),
+                start = caretIndex,
+                end = caretIndex + 1
+            )
+        }
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CodeGateCodeBackground)
     ) {
         Text(
-            text = source,
+            text = renderedSource,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 180.dp, max = 420.dp)
