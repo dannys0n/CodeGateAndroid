@@ -6,13 +6,13 @@ plugins {
 android {
     namespace = "dev.codegate.mobile"
     compileSdk {
-        version = release(37)
+        version = release(36)
     }
 
     defaultConfig {
         applicationId = "dev.codegate.mobile"
         minSdk = 24
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 3
         versionName = "1.0.2"
 
