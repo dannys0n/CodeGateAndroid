@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +43,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
@@ -51,10 +53,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import dev.codegate.mobile.ui.theme.CodeGateCodeBackground
+import dev.codegate.mobile.ui.theme.CodeGateDifficultyBeginner
+import dev.codegate.mobile.ui.theme.CodeGateDifficultyEasy
+import dev.codegate.mobile.ui.theme.CodeGateDifficultyHard
+import dev.codegate.mobile.ui.theme.CodeGateDifficultyMedium
 import dev.codegate.mobile.ui.theme.CodeGateText
 
 private enum class ExerciseMode { BLOCKS, SYNTAX }
-private val ALL_DIFFICULTIES = setOf("easy", "medium", "hard")
+private val AVAILABLE_DIFFICULTIES = setOf("beginner", "easy", "medium", "hard")
+private val DEFAULT_DIFFICULTIES = setOf("easy", "medium", "hard")
 
 @Composable
 fun CodeGatePrototype(
@@ -79,10 +86,10 @@ fun CodeGatePrototype(
     }
     var allowedDifficulties by remember {
         mutableStateOf(
-            preferences.getStringSet("problem_difficulties", ALL_DIFFICULTIES)
-                ?.intersect(ALL_DIFFICULTIES)
+            preferences.getStringSet("problem_difficulties", DEFAULT_DIFFICULTIES)
+                ?.intersect(AVAILABLE_DIFFICULTIES)
                 ?.takeIf { it.isNotEmpty() }
-                ?: ALL_DIFFICULTIES
+                ?: DEFAULT_DIFFICULTIES
         )
     }
     var problemKey by remember { mutableIntStateOf(0) }
@@ -162,9 +169,14 @@ fun CodeGatePrototype(
                         }
 
                         SettingRow("Problem difficulty") {
-                            ALL_DIFFICULTIES.forEach { difficulty ->
+                            AVAILABLE_DIFFICULTIES.forEach { difficulty ->
                                 val label = difficulty.replaceFirstChar { it.uppercase() }
-                                ChoiceChip(label, difficulty in allowedDifficulties) {
+                                ChoiceChip(
+                                    label = label,
+                                    selected = difficulty in allowedDifficulties,
+                                    selectedColor = difficultyColor(difficulty),
+                                    selectedContentColor = difficultyContentColor(difficulty)
+                                ) {
                                     val updated = if (difficulty in allowedDifficulties) {
                                         allowedDifficulties - difficulty
                                     } else {
@@ -285,13 +297,55 @@ private fun SettingRow(label: String, content: @Composable RowScope.() -> Unit) 
 }
 
 @Composable
-private fun ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    selectedColor: Color? = null,
+    selectedContentColor: Color = Color.Black,
+    onClick: () -> Unit
+) {
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label) },
-        shape = RoundedCornerShape(10.dp)
+        shape = RoundedCornerShape(10.dp),
+        colors = if (selectedColor == null) {
+            FilterChipDefaults.filterChipColors()
+        } else {
+            FilterChipDefaults.filterChipColors(
+                selectedContainerColor = selectedColor,
+                selectedLabelColor = selectedContentColor
+            )
+        }
     )
+}
+
+private fun difficultyColor(difficulty: String): Color = when (difficulty.lowercase()) {
+    "beginner" -> CodeGateDifficultyBeginner
+    "medium" -> CodeGateDifficultyMedium
+    "hard" -> CodeGateDifficultyHard
+    else -> CodeGateDifficultyEasy
+}
+
+private fun difficultyContentColor(difficulty: String): Color = when (difficulty.lowercase()) {
+    "beginner", "hard" -> Color.White
+    else -> Color.Black
+}
+
+@Composable
+private fun DifficultyBadge(difficulty: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = difficultyColor(difficulty),
+        contentColor = difficultyContentColor(difficulty)
+    ) {
+        Text(
+            text = difficulty,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
 }
 
 @Composable
@@ -303,7 +357,13 @@ private fun ProblemCard(lesson: Lesson) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(lesson.title, style = MaterialTheme.typography.titleLarge)
-            Text("${lesson.difficulty} · ${if (lesson.language == "cpp") "C++" else "Python"}")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DifficultyBadge(lesson.difficulty)
+                Text(
+                    if (lesson.language == "cpp") "C++" else "Python",
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
             Text(cleanStatement(lesson.statement))
             lesson.examples.forEachIndexed { index, example ->
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -53,7 +53,7 @@ class LessonRepository(private val context: Context) {
     }
 
     private fun loadLanguage(language: String): List<Lesson> =
-        listOf("easy", "medium", "hard").flatMap { difficulty ->
+        listOf("beginner", "easy", "medium", "hard").flatMap { difficulty ->
             loadShard(language, difficulty)
         }
 
@@ -105,7 +105,7 @@ class LessonRepository(private val context: Context) {
     }
 
     private companion object {
-        val ALL_DIFFICULTIES = setOf("easy", "medium", "hard")
+        val ALL_DIFFICULTIES = setOf("beginner", "easy", "medium", "hard")
     }
 }
 
