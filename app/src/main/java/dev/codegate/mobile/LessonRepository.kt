@@ -13,10 +13,12 @@ data class LessonBlock(
 
 data class Lesson(
     val id: String,
+    val problemId: String,
     val title: String,
     val difficulty: String,
     val language: String,
     val statement: String,
+    val examples: List<String>,
     val hints: List<String>,
     val fixedPrefix: String,
     val fixedSuffix: String,
@@ -36,8 +38,11 @@ data class Lesson(
 class LessonRepository(private val context: Context) {
     private val cache = mutableMapOf<String, List<Lesson>>()
 
-    fun randomLesson(language: String): Lesson {
+    fun lesson(language: String, problemId: String? = null): Lesson {
         val lessons = cache.getOrPut(language) { loadShard(language) }
+        if (problemId != null) {
+            lessons.firstOrNull { it.problemId == problemId }?.let { return it }
+        }
         return lessons[Random.nextInt(lessons.size)]
     }
 
@@ -71,10 +76,12 @@ class LessonRepository(private val context: Context) {
                 add(
                     Lesson(
                         id = item.getString("id"),
+                        problemId = item.getString("problemId"),
                         title = item.getString("title"),
                         difficulty = item.getString("difficulty"),
                         language = item.getString("language"),
                         statement = item.getString("statement"),
+                        examples = item.getJSONArray("examples").toStringList(),
                         hints = item.getJSONArray("hints").toStringList(),
                         fixedPrefix = item.getString("fixedPrefix"),
                         fixedSuffix = item.getString("fixedSuffix"),

@@ -68,7 +68,7 @@ class SyntaxChoiceEngine(private val lesson: Lesson) {
 
     fun renderedSource(cursor: Int): String {
         val accepted = tokens.take(cursor).joinToString(separator = "") { it.leading + it.text }
-        val marker = if (cursor < tokens.size) "\n        ▌" else ""
+        val marker = if (cursor < tokens.size) tokens[cursor].leading + "▌" else ""
         return lesson.fixedPrefix + accepted + marker + lesson.fixedSuffix
     }
 

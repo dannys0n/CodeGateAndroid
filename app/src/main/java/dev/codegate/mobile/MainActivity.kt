@@ -18,19 +18,25 @@ class MainActivity : ComponentActivity() {
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) startUnlockMonitor()
-        requestOverlayPermissionIfNeeded()
+        if (granted && WakeLaunchSettings.isEnabled(this)) startUnlockMonitor()
+        if (WakeLaunchSettings.isEnabled(this)) requestOverlayPermissionIfNeeded()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startUnlockMonitor()
-        requestRequiredPermissions()
+        if (WakeLaunchSettings.isEnabled(this)) {
+            startUnlockMonitor()
+            requestRequiredPermissions()
+        }
         enableEdgeToEdge()
         val repository = LessonRepository(applicationContext)
         setContent {
             CodeGateAndroidTheme {
-                CodeGatePrototype(repository)
+                CodeGatePrototype(
+                    repository = repository,
+                    onSubmit = ::finishAndRemoveTask,
+                    onWakeLaunchChanged = ::setWakeLaunchEnabled
+                )
             }
         }
     }
@@ -40,6 +46,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestRequiredPermissions() {
+        if (!WakeLaunchSettings.isEnabled(this)) return
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -48,6 +55,16 @@ class MainActivity : ComponentActivity() {
             return
         }
         requestOverlayPermissionIfNeeded()
+    }
+
+    private fun setWakeLaunchEnabled(enabled: Boolean) {
+        WakeLaunchSettings.setEnabled(this, enabled)
+        if (enabled) {
+            startUnlockMonitor()
+            requestRequiredPermissions()
+        } else {
+            stopService(Intent(this, UnlockMonitorService::class.java))
+        }
     }
 
     private fun requestOverlayPermissionIfNeeded() {
