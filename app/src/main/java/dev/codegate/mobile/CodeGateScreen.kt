@@ -24,6 +24,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -530,6 +531,7 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
     var checking by remember(lesson.id) { mutableStateOf(false) }
     var readyToSubmit by remember(lesson.id) { mutableStateOf(false) }
     var feedbackVisible by remember(lesson.id) { mutableStateOf(false) }
+    var lockedPositions by remember(lesson.id) { mutableStateOf(emptySet<Int>()) }
     val messageRequester = remember { BringIntoViewRequester() }
     val byId = remember(lesson.id) { lesson.blocks.associateBy { it.id } }
     val presentedBlocks = remember(lesson.id) { lesson.blocks.shuffled() }
@@ -601,6 +603,31 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = {
+                val position = lesson.correctOrder.indices.firstOrNull { index ->
+                    selected.getOrNull(index) != lesson.correctOrder[index]
+                } ?: return@Button
+                val correctBlockId = lesson.correctOrder[position]
+                val updated = selected.toMutableList()
+                val existingPosition = updated.indexOf(correctBlockId)
+                if (existingPosition >= 0) updated.removeAt(existingPosition)
+                if (position < updated.size) updated[position] = correctBlockId
+                else updated.add(correctBlockId)
+                selected = updated
+                lockedPositions = lockedPositions + position
+                message = ""
+                checking = false
+                feedbackVisible = false
+                readyToSubmit = updated == lesson.correctOrder
+            },
+            enabled = !readyToSubmit && !checking,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = CodeGateDifficultyMedium,
+                contentColor = Color.Black
+            )
+        ) { Text("Help?") }
         OutlinedButton(
             onClick = {
                 selected = selected.dropLast(1)
@@ -608,7 +635,7 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
                 readyToSubmit = false
                 feedbackVisible = false
             },
-            enabled = selected.isNotEmpty() && !checking,
+            enabled = selected.isNotEmpty() && selected.lastIndex !in lockedPositions && !checking,
             shape = RoundedCornerShape(10.dp)
         ) { Text("Undo") }
         TextButton(
@@ -618,6 +645,7 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
                 checking = false
                 readyToSubmit = false
                 feedbackVisible = false
+                lockedPositions = emptySet()
             }
         ) { Text("Reset") }
         Button(
