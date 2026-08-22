@@ -68,6 +68,16 @@ import dev.codegate.mobile.ui.theme.CodeGateText
 
 private enum class ExerciseMode { BLOCKS, SYNTAX }
 private const val CARET_MARKER = '\u258C'
+private data class CodeHighlight(val start: Int, val end: Int, val correct: Boolean)
+
+private fun blockComment(language: String, number: Int, source: String = ""): String {
+    val indent = source.lineSequence()
+        .firstOrNull { it.isNotBlank() }
+        ?.takeWhile { it == ' ' || it == '\t' }
+        .orEmpty()
+    val marker = if (language == "python") "#" else "//"
+    return "$indent$marker Block $number\n"
+}
 private val DEFAULT_DIFFICULTIES = setOf(
     ProblemDifficulty.EASY,
     ProblemDifficulty.MEDIUM,
@@ -450,7 +460,7 @@ private fun CodeChoice(code: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CodePanel(source: String) {
+private fun CodePanel(source: String, highlights: List<CodeHighlight> = emptyList()) {
     var caretVisible by remember(source) { mutableStateOf(true) }
     val caretIndex = source.indexOf(CARET_MARKER)
     val verticalScroll = rememberScrollState()
@@ -471,6 +481,19 @@ private fun CodePanel(source: String) {
     }
     val renderedSource = buildAnnotatedString {
         append(source)
+        highlights.forEach { highlight ->
+            addStyle(
+                SpanStyle(
+                    background = if (highlight.correct) {
+                        CodeGateDifficultyEasy.copy(alpha = 0.32f)
+                    } else {
+                        CodeGateDifficultyHard.copy(alpha = 0.38f)
+                    }
+                ),
+                start = highlight.start,
+                end = highlight.end
+            )
+        }
         if (caretIndex >= 0 && !caretVisible) {
             addStyle(
                 SpanStyle(color = Color.Transparent),
@@ -506,12 +529,41 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
     var message by remember(lesson.id) { mutableStateOf("") }
     var checking by remember(lesson.id) { mutableStateOf(false) }
     var readyToSubmit by remember(lesson.id) { mutableStateOf(false) }
+    var feedbackVisible by remember(lesson.id) { mutableStateOf(false) }
     val messageRequester = remember { BringIntoViewRequester() }
     val byId = remember(lesson.id) { lesson.blocks.associateBy { it.id } }
-    val available = remember(lesson.id) { lesson.blocks.shuffled() }
-        .filterNot { it.id in selected }
-    val assembled = lesson.fixedPrefix + selected.mapNotNull(byId::get)
-        .joinToString(separator = "") { it.sourceCode } + "\n        $CARET_MARKER" + lesson.fixedSuffix
+    val presentedBlocks = remember(lesson.id) { lesson.blocks.shuffled() }
+    val presentationNumberById = remember(lesson.id) {
+        presentedBlocks.mapIndexed { index, block -> block.id to index + 1 }.toMap()
+    }
+    val available = presentedBlocks.filterNot { it.id in selected }
+    val selectedBlocks = selected.mapNotNull(byId::get)
+    val displayedSelectedBlocks = selectedBlocks.map { block ->
+        blockComment(
+            language = lesson.language,
+            number = presentationNumberById.getValue(block.id),
+            source = block.sourceCode
+        ) + block.sourceCode
+    }
+    val assembled = lesson.fixedPrefix + displayedSelectedBlocks
+        .joinToString(separator = "") + "\n        $CARET_MARKER" + lesson.fixedSuffix
+    val highlights = if (feedbackVisible) {
+        buildList {
+            var offset = lesson.fixedPrefix.length
+            displayedSelectedBlocks.forEachIndexed { index, displayedBlock ->
+                add(
+                    CodeHighlight(
+                        start = offset,
+                        end = offset + displayedBlock.length,
+                        correct = selected.getOrNull(index) == lesson.correctOrder.getOrNull(index)
+                    )
+                )
+                offset += displayedBlock.length
+            }
+        }
+    } else {
+        emptyList()
+    }
     val progress = if (lesson.correctOrder.isEmpty()) 1f else selected.size.toFloat() / lesson.correctOrder.size
 
     LaunchedEffect(checking, selected) {
@@ -532,15 +584,19 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
         Text("${selected.size}/${lesson.correctOrder.size}")
     }
     LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-    CodePanel(assembled)
+    CodePanel(assembled, highlights)
     Text("Available blocks", style = MaterialTheme.typography.titleMedium)
     available.forEach { block ->
         CodeChoice(
-            code = block.displayCode,
+            code = blockComment(
+                language = lesson.language,
+                number = presentationNumberById.getValue(block.id)
+            ) + block.displayCode,
             onClick = {
                 selected = selected + block.id
                 message = ""
                 readyToSubmit = false
+                feedbackVisible = false
             }
         )
     }
@@ -550,6 +606,7 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
                 selected = selected.dropLast(1)
                 message = ""
                 readyToSubmit = false
+                feedbackVisible = false
             },
             enabled = selected.isNotEmpty() && !checking,
             shape = RoundedCornerShape(10.dp)
@@ -560,6 +617,7 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
                 message = ""
                 checking = false
                 readyToSubmit = false
+                feedbackVisible = false
             }
         ) { Text("Reset") }
         Button(
@@ -568,9 +626,11 @@ private fun BlockExercise(lesson: Lesson, onSubmit: () -> Unit) {
                     onSubmit()
                 } else if (selected == lesson.correctOrder) {
                     message = ""
+                    feedbackVisible = true
                     checking = true
                 } else {
-                    message = "Not yet—the block order is incorrect."
+                    feedbackVisible = true
+                    message = "Green blocks are correctly placed. Red blocks are in the wrong position."
                 }
             },
             enabled = !checking,
